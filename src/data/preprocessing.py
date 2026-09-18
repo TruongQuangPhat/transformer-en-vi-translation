@@ -1,5 +1,8 @@
 from pathlib import Path
 from statistics import mean, median
+import re
+import unicodedata
+from html import unescape
 
 def load_parallel_data(
     src_path: Path,
@@ -219,3 +222,82 @@ def inspect_dataset(
         for index, (src, tgt) in enumerate(long_pairs, start=1):
             print(f"\n  [{index}] EN: {src}")
             print(f"      VI: {tgt}")
+
+def normalize_sentence(sentence: str) -> str:
+    """
+    Normalize text without changing its linguistic content.
+
+    Operations:
+        1. Unicode normalization (NFC)
+        2. HTML entity decoding
+        3. Collapse repeated whitespace
+        4. Strip leading/trailing whitespace
+    """
+    sentence = unicodedata.normalize("NFC", sentence)
+    sentence = unescape(sentence)
+    sentence = re.sub(r"\s+", " ", sentence)
+
+    return sentence.strip()
+
+def clean_parallel_data(
+    pairs: list[tuple[str, str]],
+    max_words: int = 128,
+) -> tuple[list[tuple[str, str]], dict[str, int]]:
+    """
+    Clean and filter parallel sentence pairs.
+
+    Returns:
+        cleaned_pairs:
+            Cleaned source-target pairs.
+
+        stats:
+            Statistics describing how many pairs were removed.
+    """
+    original_count = len(pairs)
+
+    normalized_pairs: list[tuple[str, str]] = []
+
+    empty_pairs_removed = 0
+    overlong_pairs_removed = 0
+
+    for src, tgt in pairs:
+        src = normalize_sentence(src)
+        tgt = normalize_sentence(tgt)
+
+        if not src or not tgt:
+            empty_pairs_removed += 1
+            continue
+
+        if (
+            sentence_word_length(src) > max_words
+            or sentence_word_length(tgt) > max_words
+        ):
+            overlong_pairs_removed += 1
+            continue
+
+        normalized_pairs.append((src, tgt))
+
+    unique_pairs: list[tuple[str, str]] = []
+    seen_pairs: set[tuple[str, str]] = set()
+
+    for pair in normalized_pairs:
+        if pair in seen_pairs:
+            continue
+
+        seen_pairs.add(pair)
+        unique_pairs.append(pair)
+
+    duplicate_pairs_removed = (
+        len(normalized_pairs) - len(unique_pairs)
+    )
+
+    stats = {
+        "original_pairs": original_count,
+        "empty_pairs_removed": empty_pairs_removed,
+        "overlong_pairs_removed": overlong_pairs_removed,
+        "duplicate_pairs_removed": duplicate_pairs_removed,
+        "final_pairs": len(unique_pairs),
+        "total_removed": original_count - len(unique_pairs),
+    }
+
+    return unique_pairs, stats
