@@ -20,11 +20,13 @@ class ScaledDotProductAttention(nn.Module):
         Compute the attention output.
 
         Args:
-            query: Query tensor with shape [B, S_q, d_k].
-            key: Key tensor with shape [B, S_k, d_k].
-            value: Value tensor with shape [B, S_v, d_v].
+            query: Query tensor with shape [..., S_q, d_k].
+            key: Key tensor with shape [..., S_k, d_k].
+            value: Value tensor with shape [..., S_k, d_v].
         Returns:
-            Attention output tensor with shape [B, S_q, d_v].
+            A tuple containing:
+            - Attention output with shape [..., S_q, d_v].
+            - Attention weights with shape [..., S_q, S_k].
         """
         d_k = query.size(-1)
         scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
