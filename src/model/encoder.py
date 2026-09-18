@@ -69,3 +69,62 @@ class EncoderLayer(nn.Module):
         feed_forward_output = self.feed_forward(x)
         x = self.norm2(x + self.dropout2(feed_forward_output))
         return x, attention_weights
+
+
+class Encoder(nn.Module):
+    """
+    Transformer Encoder composed of multiple Encoder layers.
+    """
+    def __init__(
+        self,
+        num_layers: int,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        dropout: float = 0.1,
+    ) -> None:
+        """
+        Args:
+            num_layers: Number of Encoder layers.
+            d_model: Model representation dimension.
+            num_heads: Number of attention heads.
+            d_ff: Hidden dimension of the feed-forward network.
+            dropout: Dropout probability.
+        """
+        super().__init__()
+
+        self.layers = nn.ModuleList(
+            [
+                EncoderLayer(
+                    d_model=d_model,
+                    num_heads=num_heads,
+                    d_ff=d_ff,
+                    dropout=dropout,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+
+    def forward(
+        self,
+        x: Tensor,
+    ) -> tuple[Tensor, list[Tensor]]:
+        """
+        Apply all Encoder layers sequentially.
+
+        Args:
+            x: Input tensor with shape [B, S, d_model].
+
+        Returns:
+            A tuple containing:
+                - output: [B, S, d_model]
+                - attention weights from each layer,
+                  each with shape [B, num_heads, S, S].
+        """
+        attention_weights = []
+
+        for layer in self.layers:
+            x, layer_attention_weights = layer(x)
+            attention_weights.append(layer_attention_weights)
+
+        return x, attention_weights
