@@ -47,7 +47,11 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout
     )
 
-    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
+    def forward(
+        self,
+        x: Tensor,
+        self_attention_mask: Tensor | None = None,
+    ) -> tuple[Tensor, Tensor]:
         """
         Apply one Encoder layer.
 
@@ -64,6 +68,7 @@ class EncoderLayer(nn.Module):
             query=x,
             key=x,
             value=x,
+            mask=self_attention_mask
         )
         x = self.norm1(x + self.dropout1(attention_output)) 
         feed_forward_output = self.feed_forward(x)
@@ -108,6 +113,7 @@ class Encoder(nn.Module):
     def forward(
         self,
         x: Tensor,
+        self_attention_mask: Tensor | None = None,
     ) -> tuple[Tensor, list[Tensor]]:
         """
         Apply all Encoder layers sequentially.
@@ -124,7 +130,10 @@ class Encoder(nn.Module):
         attention_weights = []
 
         for layer in self.layers:
-            x, layer_attention_weights = layer(x)
+            x, layer_attention_weights = layer(
+                x,
+                self_attention_mask=self_attention_mask
+            )
             attention_weights.append(layer_attention_weights)
 
         return x, attention_weights
