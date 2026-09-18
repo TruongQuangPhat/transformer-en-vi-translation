@@ -3,6 +3,78 @@ import math
 import torch
 from torch import Tensor, nn
 
+def create_padding_mask(
+    token_ids: Tensor,
+    pad_id: int,
+) -> Tensor:
+    """
+    Create a padding mask.
+
+    Args:
+        token_ids: Token IDs with shape [B, S].
+        pad_id: ID of the PAD token.
+
+    Returns:
+        Boolean mask with shape [B, 1, 1, S].
+        True indicates a padded position.
+    """
+    return (token_ids == pad_id).unsqueeze(1).unsqueeze(2)
+
+def create_causal_mask(
+    sequence_length: int,
+    device: torch.device | None = None,
+) -> Tensor:
+    """
+    Create a causal attention mask.
+
+    Args:
+        sequence_length: Target sequence length.
+        device: Device for the mask.
+
+    Returns:
+        Boolean mask with shape [1, 1, S, S].
+        True indicates a future position that must be masked.
+    """
+    mask = torch.triu(
+        torch.ones(
+            sequence_length,
+            sequence_length,
+            dtype=torch.bool,
+            device=device,
+        ),
+        diagonal=1,
+    )
+
+    return mask.unsqueeze(0).unsqueeze(0)
+
+def combine_masks(
+    *masks: Tensor | None,
+) -> Tensor | None:
+    """
+    Combine multiple attention masks using logical OR.
+
+    Args:
+        masks: Attention masks. None values are ignored.
+
+    Returns:
+        Combined attention mask, or None if no mask is provided.
+    """
+    valid_masks = [
+        mask
+        for mask in masks
+        if mask is not None
+    ]
+
+    if not valid_masks:
+        return None
+
+    combined_mask = valid_masks[0]
+
+    for mask in valid_masks[1:]:
+        combined_mask = combined_mask | mask
+
+    return combined_mask
+
 class ScaledDotProductAttention(nn.Module):
     """
     Compute scaled dot-product attention.
@@ -15,6 +87,7 @@ class ScaledDotProductAttention(nn.Module):
         query: Tensor,
         key: Tensor,
         value: Tensor,
+        mask: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
         """
         Compute the attention output.
@@ -23,6 +96,8 @@ class ScaledDotProductAttention(nn.Module):
             query: Query tensor with shape [..., S_q, d_k].
             key: Key tensor with shape [..., S_k, d_k].
             value: Value tensor with shape [..., S_k, d_v].
+            mask: Boolean attention mask. True means the position
+                  should be masked.
         Returns:
             A tuple containing:
             - Attention output with shape [..., S_q, d_v].
@@ -30,6 +105,12 @@ class ScaledDotProductAttention(nn.Module):
         """
         d_k = query.size(-1)
         scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+
+        if mask is not None:
+            scores = scores.masked_fill(
+                mask,
+                float("-inf"),
+            )
 
         attention_weights = torch.softmax(scores, dim=-1)
         output = torch.matmul(attention_weights, value)
@@ -130,6 +211,7 @@ class MultiHeadAttention(nn.Module):
         query: Tensor,
         key: Tensor,
         value: Tensor,
+        mask: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
         """
         Compute multi-head attention.
@@ -138,6 +220,8 @@ class MultiHeadAttention(nn.Module):
             query: Query tensor with shape [B, S_q, d_model].
             key: Key tensor with shape [B, S_k, d_model].
             value: Value tensor with shape [B, S_v, d_model].
+            mask: Boolean attention mask. True means the position
+                  should be masked.
 
         Returns:
         A tuple containing:
@@ -156,7 +240,7 @@ class MultiHeadAttention(nn.Module):
         V = self._split_heads(V)
 
         # Compute attention
-        attention_output, attention_weights = self.attention(Q, K, V)
+        attention_output, attention_weights = self.attention(Q, K, V, mask)
 
         # Combine heads
         combined_output = self._combine_heads(attention_output)
