@@ -129,28 +129,38 @@ class SentencePieceTokenizer:
     def encode_pieces(self, text: str) -> list[str]:
         """
         Convert text into SentencePiece subword pieces.
-
-        Example:
-            "machine learning"
-            -> ["▁machine", "▁learn", "ing"]
         """
         return self.processor.encode(
             text,
             out_type=str,
         )
 
-    def encode_ids(self, text: str) -> list[int]:
+    def encode_ids(
+        self,
+        text: str,
+        add_bos: bool = False,
+        add_eos: bool = False,
+    ) -> list[int]:
         """
-        Convert text directly into token IDs.
+        Convert text into token IDs.
 
-        Example:
-            "machine learning"
-            -> [1523, 481, 27]
+        Args:
+            text: Input sentence.
+            add_bos: Whether to prepend the BOS token.
+            add_eos: Whether to append the EOS token.
         """
-        return self.processor.encode(
+        ids = self.processor.encode(
             text,
             out_type=int,
         )
+
+        if add_bos:
+            ids.insert(0, self.bos_id())
+
+        if add_eos:
+            ids.append(self.eos_id())
+
+        return ids
 
     def decode(self, ids: list[int]) -> str:
         """
@@ -163,6 +173,61 @@ class SentencePieceTokenizer:
         Return the vocabulary size.
         """
         return self.processor.get_piece_size()
+
+    def unk_id(self) -> int:
+        """Return the UNK token ID."""
+        return self.processor.unk_id()
+
+    def bos_id(self) -> int:
+        """Return the BOS token ID."""
+        return self.processor.bos_id()
+
+    def eos_id(self) -> int:
+        """Return the EOS token ID."""
+        return self.processor.eos_id()
+
+    def pad_id(self) -> int:
+        """Return the PAD token ID."""
+        return self.processor.pad_id()
+
+def pad_sequences(
+    sequences: list[list[int]],
+    pad_id: int,
+    max_length: int | None = None,
+) -> list[list[int]]:
+    """
+    Pad sequences to the same length.
+
+    Args:
+        sequences: Token ID sequences.
+        pad_id: ID used for padding.
+        max_length: Target length. If None, use the longest sequence.
+
+    Returns:
+        Padded sequences.
+    """
+    if not sequences:
+        return []
+
+    if max_length is None:
+        max_length = max(len(sequence) for sequence in sequences)
+
+    padded_sequences = []
+
+    for sequence in sequences:
+        if len(sequence) > max_length:
+            raise ValueError(
+                f"Sequence length {len(sequence)} exceeds max_length "
+                f"{max_length}."
+            )
+
+        padded_sequence = sequence + [pad_id] * (
+            max_length - len(sequence)
+        )
+
+        padded_sequences.append(padded_sequence)
+
+    return padded_sequences
 
 
 def load_tokenizers() -> tuple[

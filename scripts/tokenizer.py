@@ -1,6 +1,10 @@
 import argparse
 
-from data.tokenizer import load_tokenizers, train_all_tokenizers
+from data.tokenizer import (
+    load_tokenizers,
+    pad_sequences,
+    train_all_tokenizers,
+)
 
 
 def test_tokenizers() -> None:
@@ -24,18 +28,39 @@ def test_tokenizers() -> None:
 
     for language, tokenizer, text in examples:
         pieces = tokenizer.encode_pieces(text)
-        ids = tokenizer.encode_ids(text)
+        ids = tokenizer.encode_ids(text, add_bos=True, add_eos=True)
         decoded = tokenizer.decode(ids)
 
         print(f"\n[{language}]")
-        print(f"Text     : {text}")
-        print(f"Pieces   : {pieces}")
-        print(f"IDs      : {ids}")
-        print(f"Decoded  : {decoded}")
-        print(f"Vocab    : {tokenizer.vocab_size()}")
+        print(f"Text       : {text}")
+        print(f"Pieces     : {pieces}")
+        print(f"IDs        : {ids}")
+        print(f"Decoded    : {decoded}")
+        print(f"Vocab size : {tokenizer.vocab_size()}")
+
+        print("\nSpecial tokens:")
+        print(f"UNK = {tokenizer.unk_id()}")
+        print(f"BOS = {tokenizer.bos_id()}")
+        print(f"EOS = {tokenizer.eos_id()}")
+        print(f"PAD = {tokenizer.pad_id()}")
 
         if decoded != text:
-            print("Warning  : decoded text differs from original text.")
+            print("Warning    : decoded text differs from original text.")
+
+    sequences = [
+        en_tokenizer.encode_ids("I am learning."),
+        en_tokenizer.encode_ids("I love machine learning."),
+        en_tokenizer.encode_ids("Hello."),
+    ]
+
+    padded_sequences = pad_sequences(
+        sequences,
+        pad_id=en_tokenizer.pad_id(),
+    )
+
+    print("\nPadding example:")
+    for sequence, padded in zip(sequences, padded_sequences):
+        print(f"{sequence} -> {padded}")
 
 
 def main() -> None:
