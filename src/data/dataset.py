@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from data.tokenizer import (
     SentencePieceTokenizer,
@@ -130,3 +130,34 @@ def collate_translation_batch(
             dtype=torch.long,
         ),
     }
+
+def create_dataloader(
+    dataset: TranslationDataset,
+    batch_size: int,
+    src_pad_id: int,
+    tgt_pad_id: int,
+    shuffle: bool = False,
+) -> DataLoader:
+    """
+    Create a DataLoader for the translation dataset.
+
+    Args:
+        dataset: Translation dataset.
+        batch_size: Number of samples per batch.
+        src_pad_id: Padding ID for the source language.
+        tgt_pad_id: Padding ID for the target language.
+        shuffle: Whether to shuffle the dataset.
+
+    Returns:
+        Configured PyTorch DataLoader.
+    """
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=lambda batch: collate_translation_batch(
+            batch=batch,
+            src_pad_id=src_pad_id,
+            tgt_pad_id=tgt_pad_id,
+        ),
+    )
