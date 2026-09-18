@@ -15,6 +15,11 @@ EOS_ID = 2
 PAD_ID = 3
 
 
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+
+
 def prepare_tokenizer_corpus(
     jsonl_path: Path,
     output_path: Path,
@@ -50,6 +55,10 @@ def train_tokenizer(
 ) -> None:
     """
     Train a SentencePiece BPE tokenizer.
+
+    Args:
+        corpus_path: Path to the training text corpus.
+        model_prefix: Output prefix for the SentencePiece model files.
     """
     model_prefix.parent.mkdir(parents=True, exist_ok=True)
 
@@ -68,7 +77,7 @@ def train_tokenizer(
 
 def train_all_tokenizers() -> None:
     """
-    Prepare corpora and train English and Vietnamese tokenizers.
+    Prepare training corpora and train both language tokenizers.
     """
     en_corpus = TOKENIZER_DIR / "train.en.txt"
     vi_corpus = TOKENIZER_DIR / "train.vi.txt"
@@ -99,5 +108,81 @@ def train_all_tokenizers() -> None:
     )
 
 
-if __name__ == "__main__":
-    train_all_tokenizers()
+# ---------------------------------------------------------------------------
+# Inference
+# ---------------------------------------------------------------------------
+
+
+class SentencePieceTokenizer:
+    """Wrapper around a trained SentencePiece tokenizer."""
+
+    def __init__(self, model_path: Path):
+        if not model_path.exists():
+            raise FileNotFoundError(
+                f"Tokenizer model not found: {model_path}"
+            )
+
+        self.processor = spm.SentencePieceProcessor(
+            model_file=str(model_path)
+        )
+
+    def encode_pieces(self, text: str) -> list[str]:
+        """
+        Convert text into SentencePiece subword pieces.
+
+        Example:
+            "machine learning"
+            -> ["▁machine", "▁learn", "ing"]
+        """
+        return self.processor.encode(
+            text,
+            out_type=str,
+        )
+
+    def encode_ids(self, text: str) -> list[int]:
+        """
+        Convert text directly into token IDs.
+
+        Example:
+            "machine learning"
+            -> [1523, 481, 27]
+        """
+        return self.processor.encode(
+            text,
+            out_type=int,
+        )
+
+    def decode(self, ids: list[int]) -> str:
+        """
+        Convert token IDs back into text.
+        """
+        return self.processor.decode(ids)
+
+    def vocab_size(self) -> int:
+        """
+        Return the vocabulary size.
+        """
+        return self.processor.get_piece_size()
+
+
+def load_tokenizers() -> tuple[
+    SentencePieceTokenizer,
+    SentencePieceTokenizer,
+]:
+    """
+    Load the trained English and Vietnamese tokenizers.
+
+    Returns:
+        A tuple containing:
+            - English tokenizer
+            - Vietnamese tokenizer
+    """
+    en_tokenizer = SentencePieceTokenizer(
+        TOKENIZER_DIR / "tokenizer_en.model"
+    )
+
+    vi_tokenizer = SentencePieceTokenizer(
+        TOKENIZER_DIR / "tokenizer_vi.model"
+    )
+
+    return en_tokenizer, vi_tokenizer
