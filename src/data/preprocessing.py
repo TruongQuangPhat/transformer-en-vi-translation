@@ -3,6 +3,7 @@ from statistics import mean, median
 import re
 import unicodedata
 from html import unescape
+import json
 
 def load_parallel_data(
     src_path: Path,
@@ -301,3 +302,31 @@ def clean_parallel_data(
     }
 
     return unique_pairs, stats
+
+def save_parallel_data(
+    pairs: list[tuple[str, str]],
+    output_path: Path,
+) -> None:
+    """
+    Save parallel sentence pairs as JSONL.
+
+    Each line contains one JSON object with:
+        - src: source sentence
+        - tgt: target sentence
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open("w", encoding="utf-8") as file:
+        for src, tgt in pairs:
+            record = {
+                "src": src,
+                "tgt": tgt,
+            }
+
+            file.write(
+                json.dumps(
+                    record,
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
