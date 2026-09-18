@@ -1,9 +1,13 @@
 import json
 from pathlib import Path
 
+import torch
 from torch.utils.data import Dataset
 
-from data.tokenizer import SentencePieceTokenizer
+from data.tokenizer import (
+    SentencePieceTokenizer,
+    pad_sequences,
+)
 
 
 class TranslationDataset(Dataset):
@@ -86,3 +90,43 @@ class TranslationDataset(Dataset):
             "src_ids": src_ids,
             "tgt_ids": tgt_ids,
         }
+
+def collate_translation_batch(
+    batch: list[dict[str, list[int]]],
+    src_pad_id: int,
+    tgt_pad_id: int,
+) -> dict[str, torch.Tensor]:
+    """
+    Collate translation samples into padded tensors.
+
+    Args:
+        batch: List of tokenized translation samples.
+        src_pad_id: Padding ID for the source language.
+        tgt_pad_id: Padding ID for the target language.
+
+    Returns:
+        Dictionary containing padded source and target tensors.
+    """
+    src_sequences = [sample["src_ids"] for sample in batch]
+    tgt_sequences = [sample["tgt_ids"] for sample in batch]
+
+    src_padded = pad_sequences(
+        sequences=src_sequences,
+        pad_id=src_pad_id,
+    )
+
+    tgt_padded = pad_sequences(
+        sequences=tgt_sequences,
+        pad_id=tgt_pad_id,
+    )
+
+    return {
+        "src_ids": torch.tensor(
+            src_padded,
+            dtype=torch.long,
+        ),
+        "tgt_ids": torch.tensor(
+            tgt_padded,
+            dtype=torch.long,
+        ),
+    }
