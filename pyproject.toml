@@ -1,0 +1,26 @@
+[project]
+name = "transformer-en-vi-translation"
+version = "0.1.0"
+description = "English-Vietnamese neural machine translation with Transformer"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml",
+    "sacrebleu",
+    "sentencepiece",
+    "torch==2.6.0",
+    "tqdm",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
