@@ -2,95 +2,161 @@ from pathlib import Path
 
 import torch
 
+from config import load_config
+
 from data.dataset import (
     TranslationDataset,
     create_dataloader,
 )
 
 from data.tokenizer import load_tokenizers
+
 from model.transformer import Transformer
+
 from training.loss import TranslationLoss
+
 from training.optimizer import (
     create_noam_scheduler,
     create_optimizer,
 )
+
 from training.trainer import Trainer
 
 
-TRAIN_PATH = Path("data/processed/train.jsonl")
-VAL_PATH = Path("data/processed/validation.jsonl")
+config = load_config()
 
-BATCH_SIZE = 32
+data_config = config["data"]
+model_config = config["model"]
+training_config = config["training"]
 
-D_MODEL = 128
-NUM_HEADS = 4
-D_FF = 512
+TRAIN_PATH = (
+    Path(data_config["processed_dir"])
+    / data_config["splits"]["train"][
+        "output_file"
+    ]
+)
 
-NUM_ENCODER_LAYERS = 2
-NUM_DECODER_LAYERS = 2
+VAL_PATH = (
+    Path(data_config["processed_dir"])
+    / data_config["splits"]["validation"][
+        "output_file"
+    ]
+)
 
-DROPOUT = 0.1
-MAX_LEN = 512
+BATCH_SIZE = training_config[
+    "batch_size"
+]
 
-NUM_EPOCHS = 30
+D_MODEL = model_config["d_model"]
+NUM_HEADS = model_config["num_heads"]
+D_FF = model_config["d_ff"]
 
-WARMUP_STEPS = 8000
-LR_SCALE = 1.5
+NUM_ENCODER_LAYERS = model_config[
+    "num_encoder_layers"
+]
 
-CHECKPOINT_DIR = Path("checkpoints")
-RESUME = False
-CHECKPOINT_PATH = CHECKPOINT_DIR / "latest.pt"
+NUM_DECODER_LAYERS = model_config[
+    "num_decoder_layers"
+]
+
+DROPOUT = model_config["dropout"]
+MAX_LEN = model_config["max_len"]
+
+NUM_EPOCHS = training_config[
+    "num_epochs"
+]
+
+WARMUP_STEPS = training_config[
+    "warmup_steps"
+]
+
+LR_SCALE = training_config[
+    "lr_scale"
+]
+
+CHECKPOINT_DIR = Path(
+    training_config["checkpoint_dir"]
+)
+
+RESUME = training_config["resume"]
+
+CHECKPOINT_PATH = (
+    CHECKPOINT_DIR / "latest.pt"
+)
 
 
 def main() -> None:
     """Train the Transformer translation model."""
 
     device = torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu"
+        "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
     )
 
-    print("Device:", device)
-
-    en_tokenizer, vi_tokenizer = load_tokenizers()
-
-    train_dataset = TranslationDataset(
-        jsonl_path=TRAIN_PATH,
-        src_tokenizer=en_tokenizer,
-        tgt_tokenizer=vi_tokenizer,
+    print(
+        "Device:",
+        device,
     )
 
-    val_dataset = TranslationDataset(
-        jsonl_path=VAL_PATH,
-        src_tokenizer=en_tokenizer,
-        tgt_tokenizer=vi_tokenizer,
+    en_tokenizer, vi_tokenizer = (
+        load_tokenizers()
     )
 
-    train_loader = create_dataloader(
-        dataset=train_dataset,
-        batch_size=BATCH_SIZE,
-        src_pad_id=en_tokenizer.pad_id(),
-        tgt_pad_id=vi_tokenizer.pad_id(),
-        shuffle=True,
+    train_dataset = (
+        TranslationDataset(
+            jsonl_path=TRAIN_PATH,
+            src_tokenizer=en_tokenizer,
+            tgt_tokenizer=vi_tokenizer,
+        )
     )
 
-    val_loader = create_dataloader(
-        dataset=val_dataset,
-        batch_size=BATCH_SIZE,
-        src_pad_id=en_tokenizer.pad_id(),
-        tgt_pad_id=vi_tokenizer.pad_id(),
-        shuffle=False,
+    val_dataset = (
+        TranslationDataset(
+            jsonl_path=VAL_PATH,
+            src_tokenizer=en_tokenizer,
+            tgt_tokenizer=vi_tokenizer,
+        )
+    )
+
+    train_loader = (
+        create_dataloader(
+            dataset=train_dataset,
+            batch_size=BATCH_SIZE,
+            src_pad_id=en_tokenizer.pad_id(),
+            tgt_pad_id=vi_tokenizer.pad_id(),
+            shuffle=True,
+        )
+    )
+
+    val_loader = (
+        create_dataloader(
+            dataset=val_dataset,
+            batch_size=BATCH_SIZE,
+            src_pad_id=en_tokenizer.pad_id(),
+            tgt_pad_id=vi_tokenizer.pad_id(),
+            shuffle=False,
+        )
     )
 
     model = Transformer(
-        src_vocab_size=en_tokenizer.vocab_size(),
-        tgt_vocab_size=vi_tokenizer.vocab_size(),
+        src_vocab_size=(
+            en_tokenizer.vocab_size()
+        ),
+        tgt_vocab_size=(
+            vi_tokenizer.vocab_size()
+        ),
         src_pad_id=en_tokenizer.pad_id(),
         tgt_pad_id=vi_tokenizer.pad_id(),
         d_model=D_MODEL,
         num_heads=NUM_HEADS,
         d_ff=D_FF,
-        num_encoder_layers=NUM_ENCODER_LAYERS,
-        num_decoder_layers=NUM_DECODER_LAYERS,
+        num_encoder_layers=(
+            NUM_ENCODER_LAYERS
+        ),
+        num_decoder_layers=(
+            NUM_DECODER_LAYERS
+        ),
         max_len=MAX_LEN,
         dropout=DROPOUT,
     ).to(device)
@@ -126,10 +192,14 @@ def main() -> None:
     if RESUME:
         if not CHECKPOINT_PATH.exists():
             raise FileNotFoundError(
-                f"Checkpoint not found: {CHECKPOINT_PATH}"
+                "Checkpoint not found: "
+                f"{CHECKPOINT_PATH}"
             )
 
-        start_epoch, best_val_loss = trainer.load_checkpoint(
+        (
+            start_epoch,
+            best_val_loss,
+        ) = trainer.load_checkpoint(
             CHECKPOINT_PATH,
         )
 

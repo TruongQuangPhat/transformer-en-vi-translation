@@ -1,0 +1,72 @@
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+
+  download:
+    base_url: https://github.com/stefan-it/nmt-en-vi/raw/master/data
+
+    files:
+      train: train-en-vi.tgz
+      validation: dev-2012-en-vi.tgz
+      test: test-2013-en-vi.tgz
+
+  splits:
+    train:
+      src_file: train.en
+      tgt_file: train.vi
+      output_file: train.jsonl
+
+    validation:
+      src_file: tst2012.en
+      tgt_file: tst2012.vi
+      output_file: validation.jsonl
+
+    test:
+      src_file: tst2013.en
+      tgt_file: tst2013.vi
+      output_file: test.jsonl
+
+  preprocessing:
+    max_words: 128
+
+
+tokenizer:
+  dir: data/tokenizer
+  vocab_size: 8000
+
+  special_tokens:
+    unk_id: 0
+    bos_id: 1
+    eos_id: 2
+    pad_id: 3
+
+
+model:
+  d_model: 128
+  num_heads: 4
+  d_ff: 512
+
+  num_encoder_layers: 2
+  num_decoder_layers: 2
+
+  dropout: 0.1
+  max_len: 512
+
+
+training:
+  batch_size: 32
+  num_epochs: 30
+
+  warmup_steps: 8000
+  lr_scale: 1.5
+
+  checkpoint_dir: checkpoints
+  resume: false
+
+
+inference:
+  checkpoint_name: best.pt
+  max_len: 128
+
+  beam_size: 5
+  length_penalty: 0.6

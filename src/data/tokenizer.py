@@ -3,21 +3,37 @@ from pathlib import Path
 
 import sentencepiece as spm
 
-
-TRAIN_DATA_PATH = Path("data/processed/train.jsonl")
-TOKENIZER_DIR = Path("data/tokenizer")
-
-VOCAB_SIZE = 8_000
-
-UNK_ID = 0
-BOS_ID = 1
-EOS_ID = 2
-PAD_ID = 3
+from config import load_config
 
 
-# ---------------------------------------------------------------------------
-# Training
-# ---------------------------------------------------------------------------
+config = load_config()
+
+data_config = config["data"]
+tokenizer_config = config["tokenizer"]
+
+TRAIN_DATA_PATH = (
+    Path(data_config["processed_dir"])
+    / data_config["splits"]["train"][
+        "output_file"
+    ]
+)
+
+TOKENIZER_DIR = Path(
+    tokenizer_config["dir"]
+)
+
+VOCAB_SIZE = tokenizer_config[
+    "vocab_size"
+]
+
+SPECIAL_TOKENS = tokenizer_config[
+    "special_tokens"
+]
+
+UNK_ID = SPECIAL_TOKENS["unk_id"]
+BOS_ID = SPECIAL_TOKENS["bos_id"]
+EOS_ID = SPECIAL_TOKENS["eos_id"]
+PAD_ID = SPECIAL_TOKENS["pad_id"]
 
 
 def prepare_tokenizer_corpus(
@@ -28,25 +44,40 @@ def prepare_tokenizer_corpus(
     """
     Extract one language from a translation JSONL file.
 
-    Each output line contains one sentence for SentencePiece training.
-
     Args:
         jsonl_path: Path to the processed translation dataset.
         output_path: Path to the extracted text corpus.
         language: Either "src" or "tgt".
     """
-    if language not in {"src", "tgt"}:
-        raise ValueError("language must be 'src' or 'tgt'")
+    if language not in {
+        "src",
+        "tgt",
+    }:
+        raise ValueError(
+            "language must be 'src' or 'tgt'"
+        )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     with (
-        jsonl_path.open("r", encoding="utf-8") as input_file,
-        output_path.open("w", encoding="utf-8") as output_file,
+        jsonl_path.open(
+            "r",
+            encoding="utf-8",
+        ) as input_file,
+        output_path.open(
+            "w",
+            encoding="utf-8",
+        ) as output_file,
     ):
         for line in input_file:
             record = json.loads(line)
-            output_file.write(record[language] + "\n")
+
+            output_file.write(
+                record[language] + "\n"
+            )
 
 
 def train_tokenizer(
@@ -60,7 +91,10 @@ def train_tokenizer(
         corpus_path: Path to the training text corpus.
         model_prefix: Output prefix for the SentencePiece model files.
     """
-    model_prefix.parent.mkdir(parents=True, exist_ok=True)
+    model_prefix.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     spm.SentencePieceTrainer.train(
         input=str(corpus_path),
@@ -79,11 +113,21 @@ def train_all_tokenizers() -> None:
     """
     Prepare training corpora and train both language tokenizers.
     """
-    en_corpus = TOKENIZER_DIR / "train.en.txt"
-    vi_corpus = TOKENIZER_DIR / "train.vi.txt"
+    en_corpus = (
+        TOKENIZER_DIR / "train.en.txt"
+    )
 
-    en_model_prefix = TOKENIZER_DIR / "tokenizer_en"
-    vi_model_prefix = TOKENIZER_DIR / "tokenizer_vi"
+    vi_corpus = (
+        TOKENIZER_DIR / "train.vi.txt"
+    )
+
+    en_model_prefix = (
+        TOKENIZER_DIR / "tokenizer_en"
+    )
+
+    vi_model_prefix = (
+        TOKENIZER_DIR / "tokenizer_vi"
+    )
 
     prepare_tokenizer_corpus(
         jsonl_path=TRAIN_DATA_PATH,
@@ -108,25 +152,31 @@ def train_all_tokenizers() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Inference
-# ---------------------------------------------------------------------------
-
-
 class SentencePieceTokenizer:
     """Wrapper around a trained SentencePiece tokenizer."""
 
-    def __init__(self, model_path: Path):
+    def __init__(
+        self,
+        model_path: Path,
+    ):
         if not model_path.exists():
             raise FileNotFoundError(
-                f"Tokenizer model not found: {model_path}"
+                "Tokenizer model not found: "
+                f"{model_path}"
             )
 
-        self.processor = spm.SentencePieceProcessor(
-            model_file=str(model_path)
+        self.processor = (
+            spm.SentencePieceProcessor(
+                model_file=str(
+                    model_path
+                )
+            )
         )
 
-    def encode_pieces(self, text: str) -> list[str]:
+    def encode_pieces(
+        self,
+        text: str,
+    ) -> list[str]:
         """
         Convert text into SentencePiece subword pieces.
         """
@@ -155,23 +205,31 @@ class SentencePieceTokenizer:
         )
 
         if add_bos:
-            ids.insert(0, self.bos_id())
+            ids.insert(
+                0,
+                self.bos_id(),
+            )
 
         if add_eos:
-            ids.append(self.eos_id())
+            ids.append(
+                self.eos_id()
+            )
 
         return ids
 
-    def decode(self, ids: list[int]) -> str:
+    def decode(
+        self,
+        ids: list[int],
+    ) -> str:
         """
         Convert token IDs back into text.
         """
-        return self.processor.decode(ids)
+        return self.processor.decode(
+            ids
+        )
 
     def vocab_size(self) -> int:
-        """
-        Return the vocabulary size.
-        """
+        """Return the vocabulary size."""
         return self.processor.get_piece_size()
 
     def unk_id(self) -> int:
@@ -189,6 +247,7 @@ class SentencePieceTokenizer:
     def pad_id(self) -> int:
         """Return the PAD token ID."""
         return self.processor.pad_id()
+
 
 def pad_sequences(
     sequences: list[list[int]],
@@ -210,22 +269,32 @@ def pad_sequences(
         return []
 
     if max_length is None:
-        max_length = max(len(sequence) for sequence in sequences)
+        max_length = max(
+            len(sequence)
+            for sequence in sequences
+        )
 
     padded_sequences = []
 
     for sequence in sequences:
         if len(sequence) > max_length:
             raise ValueError(
-                f"Sequence length {len(sequence)} exceeds max_length "
-                f"{max_length}."
+                f"Sequence length {len(sequence)} "
+                f"exceeds max_length {max_length}."
             )
 
-        padded_sequence = sequence + [pad_id] * (
-            max_length - len(sequence)
+        padded_sequence = (
+            sequence
+            + [pad_id]
+            * (
+                max_length
+                - len(sequence)
+            )
         )
 
-        padded_sequences.append(padded_sequence)
+        padded_sequences.append(
+            padded_sequence
+        )
 
     return padded_sequences
 
@@ -243,11 +312,16 @@ def load_tokenizers() -> tuple[
             - Vietnamese tokenizer
     """
     en_tokenizer = SentencePieceTokenizer(
-        TOKENIZER_DIR / "tokenizer_en.model"
+        TOKENIZER_DIR
+        / "tokenizer_en.model"
     )
 
     vi_tokenizer = SentencePieceTokenizer(
-        TOKENIZER_DIR / "tokenizer_vi.model"
+        TOKENIZER_DIR
+        / "tokenizer_vi.model"
     )
 
-    return en_tokenizer, vi_tokenizer
+    return (
+        en_tokenizer,
+        vi_tokenizer,
+    )

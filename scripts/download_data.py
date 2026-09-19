@@ -1,19 +1,26 @@
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-
-DATA_DIR = Path("data/raw")
-
-BASE_URL = "https://github.com/stefan-it/nmt-en-vi/raw/master/data"
-
-FILES = {
-    "train": "train-en-vi.tgz",
-    "validation": "dev-2012-en-vi.tgz",
-    "test": "test-2013-en-vi.tgz",
-}
+from config import load_config
 
 
-def download_file(filename: str) -> Path:
+config = load_config()
+
+data_config = config["data"]
+download_config = data_config["download"]
+
+DATA_DIR = Path(
+    data_config["raw_dir"]
+)
+
+BASE_URL = download_config["base_url"]
+
+FILES = download_config["files"]
+
+
+def download_file(
+    filename: str,
+) -> Path:
     """Download one dataset archive."""
     output_path = DATA_DIR / filename
 
@@ -22,6 +29,7 @@ def download_file(filename: str) -> Path:
         return output_path
 
     url = f"{BASE_URL}/{filename}"
+
     print(f"[DOWNLOAD] {url}")
 
     request = Request(
@@ -29,22 +37,36 @@ def download_file(filename: str) -> Path:
         headers={"User-Agent": "Mozilla/5.0"},
     )
 
-    with urlopen(request, timeout=120) as response:
+    with urlopen(
+        request,
+        timeout=120,
+    ) as response:
         data = response.read()
 
     output_path.write_bytes(data)
 
     size_mb = len(data) / (1024 * 1024)
-    print(f"[OK] {filename}: {size_mb:.2f} MB")
+
+    print(
+        f"[OK] {filename}: "
+        f"{size_mb:.2f} MB"
+    )
 
     return output_path
 
 
 def main() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    """Download all configured dataset archives."""
+    DATA_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     for split, filename in FILES.items():
-        print(f"\nProcessing {split} split")
+        print(
+            f"\nProcessing {split} split"
+        )
+
         download_file(filename)
 
 
