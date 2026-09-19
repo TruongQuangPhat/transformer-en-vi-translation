@@ -6,6 +6,7 @@ from model.embeddings import TokenEmbedding
 from model.encoder import Encoder
 from model.positional_encoding import SinusoidalPositionalEncoding
 
+
 class Transformer(nn.Module):
     """
     Transformer model for sequence-to-sequence tasks.
@@ -13,8 +14,9 @@ class Transformer(nn.Module):
     Architecture:
         Encoder
         -> Decoder
-        -> Linear + Softmax
+        -> Linear projection to target vocabulary logits
     """
+
     def __init__(
         self,
         src_vocab_size: int,
@@ -91,16 +93,84 @@ class Transformer(nn.Module):
             tgt_vocab_size,
         )
 
+    def encode(
+        self,
+        src_ids: Tensor,
+    ) -> tuple[Tensor, list[Tensor]]:
+        """
+        Encode source token IDs into encoder representations.
+
+        Args:
+            src_ids: Source token IDs of shape [B, S_src].
+
+        Returns:
+            memory: Encoder output of shape [B, S_src, d_model].
+            attention_weights: Attention weights from each encoder layer.
+        """
+        src_x = self.src_embedding(src_ids)
+        src_x = self.src_positional_encoding(src_x)
+
+        src_padding_mask = create_padding_mask(
+            src_ids,
+            pad_id=self.src_pad_id,
+        )
+
+        memory, attention_weights = self.encoder(
+            x=src_x,
+            self_attention_mask=src_padding_mask,
+        )
+
+        return memory, attention_weights
+
+    def decode(
+        self,
+        tgt_ids: Tensor,
+        memory: Tensor,
+        src_ids: Tensor,
+    ) -> tuple[Tensor, list[Tensor], list[Tensor]]:
+        """
+        Decode target token IDs using encoder memory.
+
+        Args:
+            tgt_ids: Target token IDs of shape [B, S_tgt].
+            memory: Encoder output of shape [B, S_src, d_model].
+            src_ids: Source token IDs of shape [B, S_src].
+
+        Returns:
+            logits: Output logits of shape
+                [B, S_tgt, tgt_vocab_size].
+            self_attention_weights: Decoder self-attention weights.
+            cross_attention_weights: Decoder cross-attention weights.
+        """
+        tgt_x = self.tgt_embedding(tgt_ids)
+        tgt_x = self.tgt_positional_encoding(tgt_x)
+
+        (
+            decoder_output,
+            self_attention_weights,
+            cross_attention_weights,
+        ) = self.decoder(
+            x=tgt_x,
+            memory=memory,
+            target_ids=tgt_ids,
+            source_ids=src_ids,
+            tgt_pad_id=self.tgt_pad_id,
+            src_pad_id=self.src_pad_id,
+        )
+
+        logits = self.output_projection(decoder_output)
+
+        return (
+            logits,
+            self_attention_weights,
+            cross_attention_weights,
+        )
+
     def forward(
         self,
         src_ids: Tensor,
         tgt_ids: Tensor,
-    ) -> tuple[
-        Tensor,
-        list[Tensor],
-        list[Tensor],
-        list[Tensor],
-    ]:
+    ) -> tuple[Tensor, list[Tensor], list[Tensor], list[Tensor]]:
         """
         Run the complete Transformer.
 
@@ -115,39 +185,16 @@ class Transformer(nn.Module):
                 - decoder self-attention weights
                 - decoder cross-attention weights
         """
-        # Source embedding + positional encoding
-        src = self.src_embedding(src_ids)
-        src = self.src_positional_encoding(src)
+        memory, encoder_attention_weights = self.encode(src_ids)
 
-        # Source padding mask for Encoder self-attention
-        src_padding_mask = create_padding_mask(
-            src_ids,
-            pad_id=self.src_pad_id,
-        )
-
-        # Encoder
-        memory, encoder_attention_weights = self.encoder(
-            x=src,
-            self_attention_mask=src_padding_mask,
-        )
-
-        # Target embedding + positional encoding
-        tgt = self.tgt_embedding(tgt_ids)
-        tgt = self.tgt_positional_encoding(tgt)
-
-        # Decoder
-        decoder_output, decoder_self_attention_weights, decoder_cross_attention_weights = self.decoder(
-            x=tgt,
+        (
+            logits,
+            decoder_self_attention_weights,
+            decoder_cross_attention_weights,
+        ) = self.decode(
+            tgt_ids=tgt_ids,
             memory=memory,
-            target_ids=tgt_ids,
-            source_ids=src_ids,
-            tgt_pad_id=self.tgt_pad_id,
-            src_pad_id=self.src_pad_id,
-        )
-
-        # Project decoder representations to target vocabulary logits
-        logits = self.output_projection(
-            decoder_output
+            src_ids=src_ids,
         )
 
         return (

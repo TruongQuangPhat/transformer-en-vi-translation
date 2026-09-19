@@ -34,10 +34,11 @@ MAX_LEN = 512
 
 NUM_EPOCHS = 30
 
-WARMUP_STEPS = 4000
+WARMUP_STEPS = 8000
+LR_SCALE = 1.5
 
 CHECKPOINT_DIR = Path("checkpoints")
-RESUME = True
+RESUME = False
 CHECKPOINT_PATH = CHECKPOINT_DIR / "latest.pt"
 
 
@@ -106,6 +107,7 @@ def main() -> None:
         optimizer=optimizer,
         d_model=D_MODEL,
         warmup_steps=WARMUP_STEPS,
+        scale=LR_SCALE,
     )
 
     trainer = Trainer(
