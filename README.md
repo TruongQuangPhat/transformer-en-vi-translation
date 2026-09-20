@@ -35,14 +35,6 @@ A larger configuration is also experimented with:
 
 `d_model=256`, `num_heads=8`, `d_ff=1024`, `encoder_layers=4`, `decoder_layers=4`
 
-## Example
-
-**Input:**  
-`I go to school every day.`
-
-**Output:**  
-`Tôi đi học mỗi ngày.`
-
 ## Project Structure
 
 `src/data/` — Dataset, preprocessing, and tokenizer  
@@ -54,6 +46,81 @@ A larger configuration is also experimented with:
 `configs/` — Configuration files  
 `notebooks/` — Attention visualization  
 `tests/` — Unit tests
+
+## Installation
+
+### 1. Clone repository
+
+    git clone https://github.com/TruongQuangPhat/transformer-en-vi-translation.git
+    cd transformer-en-vi-translation
+
+### 2. Install dependencies
+
+Requires Python 3.11+ and `uv`.
+
+    uv sync
+
+## Data Preparation
+
+### 1. Download dataset
+
+    PYTHONPATH=src uv run python scripts/download_data.py
+
+### 2. Extract dataset
+
+    tar -xzf data/raw/train-en-vi.tgz -C data/raw
+    tar -xzf data/raw/dev-2012-en-vi.tgz -C data/raw
+    tar -xzf data/raw/test-2013-en-vi.tgz -C data/raw
+
+### 3. Prepare dataset
+
+    PYTHONPATH=src uv run python scripts/prepare_data.py
+
+### 4. Train tokenizers
+
+    PYTHONPATH=src uv run python scripts/tokenizer.py train
+
+## Training
+
+### Run training
+
+Configure the experiment in `configs/base.yaml`, then run:
+
+    PYTHONPATH=src uv run python scripts/train.py
+
+Checkpoints are saved under the configured `training.checkpoint_dir`.
+
+## Evaluation
+
+### Run evaluation
+
+Evaluate the trained model using Greedy Decoding and Beam Search:
+
+    PYTHONPATH=src uv run python scripts/evaluate.py
+
+## Inference
+
+### Run translation
+
+    PYTHONPATH=src uv run python -m src.inference.translate
+
+## Attention Visualization
+
+### Open notebook
+
+Open:
+
+`notebooks/attention_visualization.ipynb`
+
+The notebook visualizes encoder self-attention, decoder self-attention, and decoder cross-attention.
+
+## Example
+
+**Input:**  
+`I go to school every day.`
+
+**Output:**  
+`Tôi đi học mỗi ngày.`
 
 ## Tech Stack
 
